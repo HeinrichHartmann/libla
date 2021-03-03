@@ -1,10 +1,14 @@
 import numpy as np
 import scipy as sp
 import scipy.linalg as la
+from matplotlib import pyplot as plt
+
+from dataclasses import dataclass
 
 # import matplotlib.pyplot as pt
 
 EPS = 10 ** -5
+
 
 class mat(np.ndarray):
     # https://numpy.org/devdocs/user/basics.subclassing.html#simple-example-adding-an-extra-attribute-to-ndarray
@@ -15,7 +19,6 @@ class mat(np.ndarray):
     @classmethod
     def from_str(cls, s):
         return mat([[float(x) for x in r.split()] for r in s.strip().split("\n")])
-
 
     @classmethod
     def rand(cls, m, n=None):
@@ -111,11 +114,11 @@ class mat(np.ndarray):
 
     def row(self, i):
         "select i-th row"
-        return self[i,:].to_row()
+        return self[i, :].to_row()
 
     def col(self, j):
         "select j-th col"
-        return self[:,j].to_col()
+        return self[:, j].to_col()
 
     def to_row(self):
         return mat(self.reshape([1, len(self)]))
@@ -124,21 +127,21 @@ class mat(np.ndarray):
         return mat(self.reshape([len(self), 1]))
 
     def set_row(self, i, r):
-        self[i,:] = r[0,:]
+        self[i, :] = r[0, :]
 
     def set_col(self, j, c):
-        self[:,j] = c[:,0]
+        self[:, j] = c[:, 0]
 
     def vsum(self, B):
         """return block diagonal matrix with entries A,B"""
         A = self
-        m,n = A.shape
-        p,q = B.shape
-        X = np.zeros([m+p, n+q])
-        X[:m,:n] = A
-        X[m:,n:] = B
+        m, n = A.shape
+        p, q = B.shape
+        X = np.zeros([m + p, n + q])
+        X[:m, :n] = A
+        X[m:, n:] = B
         return mat(X)
-    
+
     def _repr_latex_(self):
         """Returns a LaTeX bmatrix
         :a: numpy array
@@ -172,6 +175,7 @@ class mat(np.ndarray):
             if np.abs(x) < EPS:
                 return "    0."
             return "{:6.2g}".format(x)
+
         temp_string = np.array2string(
             self,
             formatter={"float_kind": fmt},
@@ -179,11 +183,8 @@ class mat(np.ndarray):
         )
         return "mat{\n" + temp_string.replace("[[", " [").replace("]]", "] ") + "\n}"
 
-
     def plot(self):
-        pt.imshow(np.log10(1e-15 + np.abs(self)))
-        # pt.colorbar()
-
+        plt.imshow(np.log10(1e-15 + np.abs(self)))
 
 
 class Vect(mat):
@@ -230,19 +231,22 @@ def perm_transposition(n, a, b):
     p[b] = a
     return p
 
-def elim(n,b):
+
+def elim(n, b):
     """returns nxn Gauss elimination matrix"""
     E = mat.id(n)
     E.set_col(0, b)
-    E[0,0] = 1
+    E[0, 0] = 1
     return E
 
-def elim_col(n,b):
+
+def elim_col(n, b):
     """returns nxn Gauss elimination matrix"""
     E = mat.id(n)
     E.set_row(0, b)
-    E[0,0] = 1
+    E[0, 0] = 1
     return E
+
 
 def ldu(A: np.ndarray):
     """
@@ -278,13 +282,13 @@ def ldu(A: np.ndarray):
     assert (A - P @ L @ D @ U @ Q).is_null()
 
     # 3. Row elimination
-    b= D.row(0) / d
-    D = D @ elim_col(n,-b)
+    b = D.row(0) / d
+    D = D @ elim_col(n, -b)
     U = elim_col(n, b)
     assert (A - P @ L @ D @ U @ Q).is_null()
 
     # 4. Recursion
-    B = D[1:,1:]
+    B = D[1:, 1:]
     P2, L2, D2, U2, Q2 = ldu(B)
     assert (B - P2 @ L2 @ D2 @ U2 @ Q2).is_null()
     P3 = mat.id(1).vsum(P2)
@@ -293,9 +297,182 @@ def ldu(A: np.ndarray):
     U3 = mat.id(1).vsum(U2)
     Q3 = mat.id(1).vsum(Q2)
     P = P @ P3
-    L = P3.T @ L @ P3 @ L3 # This is again lower triangular!
+    L = P3.T @ L @ P3 @ L3  # This is again lower triangular!
     D = D3
-    U = U3 @ Q3 @ U @ Q3.T # This is again upper triangular!
+    U = U3 @ Q3 @ U @ Q3.T  # This is again upper triangular!
     Q = Q3 @ Q
     assert (A - P @ L @ D @ U @ Q).is_null()
     return (P, L, D, U, Q)
+
+
+def H(*args):
+    print(*args)
+
+
+@dataclass
+class MatrixFactorizationResult:
+    A: mat
+    X: mat
+    Xi: mat
+    Y: mat
+    Yi: mat
+
+    def plot(self):
+        fig, (ax1,ax2,ax3) = plt.subplots(
+            nrows=1,ncols=3,figsize=(15,5))
+        def prep(A): return np.log10(1e-15 + np.abs(A))
+        ax1.imshow(prep(self.X))
+        ax2.imshow(prep(self.A))
+        ax3.imshow(prep(self.Yi))
+
+def rd_gauss(A: np.ndarray):
+    """
+    returns R,X,X^{-1},Y,Y^{-1} so that $R = X^{-1} A Y$ <=> $ A = X R Y^{-1}$
+    is a rank-revealing diagonal matrix.
+    """
+    A = mat(A)
+    m, n = A.shape
+
+    X = mat.id(m)
+    Xi = mat.id(m)
+    R = A
+    Y = mat.id(n)
+    Yi = mat.id(n)
+
+    def check():
+        # print("CHECK!")
+        # print("A", A)
+        # print("DECOP:", Xi, R ,Y)
+        assert (mat.id(m) - X @ Xi).is_null()
+        assert (mat.id(n) - Y @ Yi).is_null()
+        assert (R - Xi @ A @ Y).is_null()
+        assert (A - X @ R @ Yi).is_null()
+        # print("OK")
+
+    check()
+
+    H("# 1. Termination Conditions")
+    if n == 0 or m == 0 or R.is_null():
+        return (R, X, Xi, Y, Yi)
+
+    H("# 2. Pivot Selection")
+    pivot = np.unravel_index(np.argmax(R, axis=None), R.shape)
+    d = R[pivot]
+    P = mat.perm(perm_transposition(m, 0, pivot[0]))
+    Q = mat.perm(perm_transposition(n, 0, pivot[1]))
+    R = P @ R @ Q
+    X = X @ P.T
+    Xi = P @ Xi
+    Yi = Q.T @ Yi
+    Y = Y @ Q
+    check()
+
+    H("# 3. Column elimination")
+    b = -R.col(0) / d
+    E = elim(m, b)
+    Ei = elim(m, -b)
+    R = E @ R
+    X = X @ Ei
+    Xi = E @ Xi
+    check()
+
+    H("# 3. Row elimination")
+    b = -R.row(0) / d
+    E = elim_col(n, b)
+    Ei = elim_col(n, -b)
+    R = R @ E
+    Yi = Ei @ Yi
+    Y = Y @ E
+    check()
+
+    H("# 4. Recursion")
+
+    def extend(M):
+        return mat.id(1).vsum(M)
+
+    B = R[1:, 1:]
+    R2, X2, X2i, Y2, Y2i = [extend(M) for M in rd_gauss(B)]
+    R = R2
+    R[0, 0] = d
+    X = X @ X2
+    Xi = X2i @ Xi
+    Yi = Y2i @ Yi
+    Y = Y @ Y2
+    check()
+    return (R, X, Xi, Y, Yi)
+
+def rd_gauss2(A: np.ndarray):
+    """
+    returns R,X,X^{-1},Y,Y^{-1} so that $R = X^{-1} A Y$ <=> $ A = X R Y^{-1}$
+    is a rank-revealing diagonal matrix.
+    """
+    A = mat(A)
+    m, n = A.shape
+
+    X = mat.id(m)
+    Xi = mat.id(m)
+    R = A
+    Y = mat.id(n)
+    Yi = mat.id(n)
+
+    def check():
+        # print("CHECK!")
+        # print("A", A)
+        # print("DECOP:", Xi, R ,Y)
+        assert (mat.id(m) - X @ Xi).is_null()
+        assert (mat.id(n) - Y @ Yi).is_null()
+        assert (R - Xi @ A @ Y).is_null()
+        assert (A - X @ R @ Yi).is_null()
+        # print("OK")
+
+    check()
+
+    H("# 1. Termination Conditions")
+    if n == 0 or m == 0 or R.is_null():
+        return (R, X, Xi, Y, Yi)
+
+    H("# 2. Pivot Selection")
+    pivot = np.unravel_index(np.argmax(R, axis=None), R.shape)
+    d = R[pivot]
+    P = mat.perm(perm_transposition(m, 0, pivot[0]))
+    Q = mat.perm(perm_transposition(n, 0, pivot[1]))
+    R = P @ R @ Q
+    X = X @ P.T
+    Xi = P @ Xi
+    Yi = Q.T @ Yi
+    Y = Y @ Q
+    check()
+
+    H("# 3. Column elimination")
+    b = -R.col(0) / d
+    E = elim(m, b)
+    Ei = elim(m, -b)
+    R = E @ R
+    X = X @ Ei
+    Xi = E @ Xi
+    check()
+
+    H("# 3. Row elimination")
+    b = -R.row(0) / d
+    E = elim_col(n, b)
+    Ei = elim_col(n, -b)
+    R = R @ E
+    Yi = Ei @ Yi
+    Y = Y @ E
+    check()
+
+    H("# 4. Recursion")
+
+    def extend(M):
+        return mat.id(1).vsum(M)
+
+    B = R[1:, 1:]
+    R2, X2, X2i, Y2, Y2i = [extend(M) for M in rd_gauss(B)]
+    R = R2
+    R[0, 0] = d
+    X = X @ X2
+    Xi = X2i @ Xi
+    Yi = Y2i @ Yi
+    Y = Y @ Y2
+    check()
+    return (R, X, Xi, Y, Yi)

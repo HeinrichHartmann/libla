@@ -11,6 +11,7 @@ scipy = "^1.6.1"
 numpy = "^1.20.1"
 pandas = "^1.2.2"
 black = "^20.8b1"
+matplotlib = "^3.3.4"
 
 [tool.poetry.dev-dependencies]
 
