@@ -19,11 +19,23 @@ class Matrix(np.ndarray):
 
     @classmethod
     def rand(cls, m, n=None):
+        """Create a mxn matrix with random entries"""
         if not n:
             n = m
         x = np.random.normal(size=n * m)
         x.resize(m, n)
         return cls(x)
+
+    @classmethod
+    def rand_rk(cls, m, n, r):
+        A = np.random.randn(m, n)
+        U, sigma, VT = la.svd(A)
+        sigma[r:] = 0
+        print("U", U.shape)
+        S = np.zeros(A.shape)
+        np.fill_diagonal(S, sigma)
+        print("VT", VT.shape)
+        return Matrix(U @ S @ VT)
 
     @classmethod
     def id(cls, n):  # "identity (id)"
@@ -59,18 +71,6 @@ class Matrix(np.ndarray):
         for i, x in enumerate(diag):
             X[i, i] = x
         return X
-
-    @classmethod
-    def rand_rk(cls, n, r):
-        "Create random nxn matrix of rk=r."
-        return Matrix.rand(n, r) @ Matrix.rand(r, n)
-
-    @classmethod
-    def rand_rk_svd(cls, n, r):
-        A = np.random.randn(n, n)
-        U, sigma, VT = la.svd(A)
-        sigma[r:] = 0
-        return Matrix((U * sigma) @ VT)
 
     def is_null(self):
         return np.allclose(self, np.zeros(self.shape), atol=EPS)
@@ -123,16 +123,16 @@ class Matrix(np.ndarray):
         return self[:, j].to_col()
 
     def to_row(self):
-        return Matrix(self.reshape([1, len(self)]))
+        return Matrix(self.reshape([1, self.size]))
 
     def to_col(self):
-        return Matrix(self.reshape([len(self), 1]))
+        return Matrix(self.reshape([self.size, 1]))
 
     def set_row(self, i, r):
-        self[i, :] = r[0, :]
+        self[i, :] = Matrix(r).to_row()[0, :]
 
     def set_col(self, j, c):
-        self[:, j] = c[:, 0]
+        self[:, j] = Matrix(c).to_col()[:, 0]
 
     def vsum(self, B):
         """return block diagonal matrix with entries A,B"""
