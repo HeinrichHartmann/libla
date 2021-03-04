@@ -12,6 +12,7 @@ numpy = "^1.20.1"
 pandas = "^1.2.2"
 black = "^20.8b1"
 matplotlib = "^3.3.4"
+hypothesis = {extras = ["numpy"], version = "^6.4.3"}
 
 [tool.poetry.dev-dependencies]
 

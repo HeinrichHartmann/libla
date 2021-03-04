@@ -15,7 +15,7 @@ class Matrix(np.ndarray):
 
     @classmethod
     def from_str(cls, s):
-        return Matrix([[float(x) for x in r.split()] for r in s.strip().split("\n")])
+        return Matrix([[float(x) for x in r.split()] for r in s.strip().replace("\n",";").split(";")])
 
     @classmethod
     def rand(cls, m, n=None):
@@ -80,6 +80,9 @@ class Matrix(np.ndarray):
         np.fill_diagonal(cp, 0)
         return cp.is_null()
 
+    def is_sim(self, B):
+        return (self.shape == B.shape) and (self - B).is_null()
+
     def inv(self):
         "Return Inverse Matrix"
         return Matrix(la.inv(self))
@@ -89,12 +92,12 @@ class Matrix(np.ndarray):
         return Matrix(la.pinv(self, cond=EPS))
 
     def svd(self):
-        U, s, V = linalg.svd(self)
+        U, s, V = la.svd(self)
         return (Matrix(U), Matrix(s), Matrix(V))
 
     def rank(self):
-        s = linalg.svd(self, compute_uv=False)
-        return len(s[s > EPS])
+        s = la.svd(self, compute_uv=False)
+        return (s > EPS).sum()
 
     def join_col(self, Y):
         return Matrix(np.concatenate([self, Y], axis=1))
@@ -191,38 +194,9 @@ class Matrix(np.ndarray):
     def plot(self):
         plt.imshow(np.log10(1e-15 + np.abs(self)))
 
-class Vect:
-    def dim(self):
-        raise NotImplementedError
-
-class SubVect(Vect):
-    def ambient(self):
-        raise NotImplementedError
-
-    def perp(self):
-        raise NotImplementedError
-
-    def perp(self):
-        raise NotImplementedError
-
-    def conatins(self, v):
-        "orthogonal complement"
-        return Vect.Ker(self.T)  # Ker(X.T) = Im(X)^perp
-
-    def contains(self, Y):
-        return (self @ self.T @ Y - Y).is_null()
-
-    def project(self, Y):
-        "project columns of Y into self"
-        return self @ self.T @ Y
-
-    def add(self, Y):
-        return Vect.Im(self.join_col(Y))
-
-
 
 class Vect(Matrix):
-    "Vector sub-spaces"
+    "Vector sub-spaces represented by a matrix"
 
     @classmethod
     def Im(cls, X):
@@ -268,10 +242,10 @@ class MatrixTransform:
     R --imap--> Xi R Yi = A original matrix
     """
 
-    X: mat
-    Xi: mat
-    Y: mat
-    Yi: mat
+    X: Matrix
+    Xi: Matrix
+    Y: Matrix
+    Yi: Matrix
 
     def is_valid(self):
         X, Xi, Y, Yi = MatrixTransform.__iter__(self)
@@ -294,7 +268,7 @@ class MatrixTransform:
 class MatrixDecomposition(MatrixTransform):
     """Holds results of matrix decomposition: R = X A Y"""
 
-    R: mat
+    R: Matrix
 
     def __iter__(self):
         # convert to tuple
@@ -307,13 +281,13 @@ class MatrixDecomposition(MatrixTransform):
             return np.log10(1e-15 + np.abs(A))
 
         ax1.imshow(prep(self.X))
-        ax2.imshow(prep(self.A))
-        ax3.imshow(prep(self.Yi))
+        ax2.imshow(prep(self.R))
+        ax3.imshow(prep(self.Y))
 
 
-def mf_gauss(A: np.ndarray):
+def md_gauss(A: np.ndarray):
     """
-    Returns MatrixFactorization with:
+    Returns MatrixDecomposition with:
     X = product of permutation and lower triagonal matrix
     Y = product of permutation and upper triagonal matrix
     R = diagonal matrix
