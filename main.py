@@ -237,84 +237,6 @@ def perm_transposition(n, a, b):
     p[b] = a
     return p
 
-
-def elim(n, b):
-    """returns nxn Gauss elimination matrix"""
-    E = mat.id(n)
-    E.set_col(0, b)
-    E[0, 0] = 1
-    return E
-
-
-def elim_col(n, b):
-    """returns nxn Gauss elimination matrix"""
-    E = mat.id(n)
-    E.set_row(0, b)
-    E[0, 0] = 1
-    return E
-
-
-def ldu(A: np.ndarray):
-    """
-    returns P,L,D,U,Q = A
-    """
-    m, n = A.shape
-    A = mat(A)
-
-    # TODO: Implement LDU by mutating those matrices
-    P = mat.id(m)
-    L = mat.id(m)
-    D = A
-    U = mat.id(n)
-    Q = mat.id(n)
-
-    # 1. Termination Conditions
-    if n == 0 or m == 0 or D.is_null():
-        return (P, L, D, U, Q)
-
-    # 2. Pivot Selection
-    pivot = np.unravel_index(np.argmax(D, axis=None), D.shape)
-    d = D[pivot]
-    P = mat.perm(perm_transposition(m, 0, pivot[0]))
-    Q = mat.perm(perm_transposition(n, 0, pivot[1]))
-    D = P @ A @ Q
-    assert D[0, 0] == d
-    assert (A - P @ L @ D @ U @ Q).is_null()
-
-    # 3. Column elimination
-    b = D.col(0) / d
-    D = elim(m, -b) @ D
-    L = elim(m, b)
-    assert (A - P @ L @ D @ U @ Q).is_null()
-
-    # 3. Row elimination
-    b = D.row(0) / d
-    D = D @ elim_col(n, -b)
-    U = elim_col(n, b)
-    assert (A - P @ L @ D @ U @ Q).is_null()
-
-    # 4. Recursion
-    B = D[1:, 1:]
-    P2, L2, D2, U2, Q2 = ldu(B)
-    assert (B - P2 @ L2 @ D2 @ U2 @ Q2).is_null()
-    P3 = mat.id(1).vsum(P2)
-    L3 = mat.id(1).vsum(L2)
-    D3 = (mat.id(1) * d).vsum(D2)
-    U3 = mat.id(1).vsum(U2)
-    Q3 = mat.id(1).vsum(Q2)
-    P = P @ P3
-    L = P3.T @ L @ P3 @ L3  # This is again lower triangular!
-    D = D3
-    U = U3 @ Q3 @ U @ Q3.T  # This is again upper triangular!
-    Q = Q3 @ Q
-    assert (A - P @ L @ D @ U @ Q).is_null()
-    return (P, L, D, U, Q)
-
-
-def H(*args):
-    print(*args)
-
-
 @dataclass
 class MatrixFactorizationResult:
     A: mat
@@ -347,83 +269,6 @@ class MatrixFactorizationResult:
         return iter([self.A, self.X, self.Xi, self.Y, self.Yi])
 
 
-def rd_gauss(A: np.ndarray):
-    """
-    returns R,X,X^{-1},Y,Y^{-1} so that $R = X^{-1} A Y$ <=> $ A = X R Y^{-1}$
-    is a rank-revealing diagonal matrix.
-    """
-    A = mat(A)
-    m, n = A.shape
-
-    X = mat.id(m)
-    Xi = mat.id(m)
-    R = A
-    Y = mat.id(n)
-    Yi = mat.id(n)
-
-    def check():
-        # print("CHECK!")
-        # print("A", A)
-        # print("DECOP:", Xi, R ,Y)
-        assert (mat.id(m) - X @ Xi).is_null()
-        assert (mat.id(n) - Y @ Yi).is_null()
-        assert (R - Xi @ A @ Y).is_null()
-        assert (A - X @ R @ Yi).is_null()
-        # print("OK")
-
-    check()
-
-    # H("# 1. Termination Conditions")
-    if n == 0 or m == 0 or R.is_null():
-        return (R, X, Xi, Y, Yi)
-
-    # H("# 2. Pivot Selection")
-    pivot = np.unravel_index(np.argmax(R, axis=None), R.shape)
-    d = R[pivot]
-    P = mat.perm(perm_transposition(m, 0, pivot[0]))
-    Q = mat.perm(perm_transposition(n, 0, pivot[1]))
-    R = P @ R @ Q
-    X = X @ P.T
-    Xi = P @ Xi
-    Yi = Q.T @ Yi
-    Y = Y @ Q
-    check()
-
-    # H("# 3. Column elimination")
-    b = -R.col(0) / d
-    E = elim(m, b)
-    Ei = elim(m, -b)
-    R = E @ R
-    X = X @ Ei
-    Xi = E @ Xi
-    check()
-
-    # H("# 3. Row elimination")
-    b = -R.row(0) / d
-    E = elim_col(n, b)
-    Ei = elim_col(n, -b)
-    R = R @ E
-    Yi = Ei @ Yi
-    Y = Y @ E
-    check()
-
-    # H("# 4. Recursion")
-
-    def extend(M):
-        return mat.id(1).vsum(M)
-
-    B = R[1:, 1:]
-    R2, X2, X2i, Y2, Y2i = [extend(M) for M in rd_gauss(B)]
-    R = R2
-    R[0, 0] = d
-    X = X @ X2
-    Xi = X2i @ Xi
-    Yi = Y2i @ Yi
-    Y = Y @ Y2
-    check()
-    return (R, X, Xi, Y, Yi)
-
-
 def elim2_row(n, r, b_orig):
     b = b_orig.copy()
     """returns nxn Gauss elimination matrix"""
@@ -445,8 +290,10 @@ def elim2_col(n, r, b_orig):
 
 def rd_gauss2(A: np.ndarray):
     """
-    returns R,X,X^{-1},Y,Y^{-1} so that $R = X^{-1} A Y$ <=> $ A = X R Y^{-1}$
-    is a rank-revealing diagonal matrix.
+    Returns MatrixFactorization with:
+    X = product of permutation and lower triagonal matrix
+    Y = product of permutation and upper triagonal matrix
+    R = diagonal matrix
     """
     A = mat(A)
     m, n = A.shape
