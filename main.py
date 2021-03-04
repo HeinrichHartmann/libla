@@ -74,6 +74,14 @@ class mat(np.ndarray):
         sigma[r:] = 0
         return mat((U * sigma) @ VT)
 
+    def is_null(self):
+        return np.allclose(self, np.zeros(self.shape), atol=EPS)
+
+    def is_diagonal(self):
+        cp = self.copy()
+        np.fill_diagonal(cp, 0)
+        return cp.is_null()
+
     def inv(self):
         return mat(la.inv(self))
 
@@ -99,9 +107,6 @@ class mat(np.ndarray):
 
     def join_row(self, Y):
         return mat(np.concatenate([self, Y], axis=0))
-
-    def is_null(self):
-        return np.allclose(self, np.zeros(self.shape), atol=EPS)
 
     def solve(self, b):
         "return solution of A x = b"
@@ -181,7 +186,8 @@ class mat(np.ndarray):
             formatter={"float_kind": fmt},
             edgeitems=3,
         )
-        return "mat{\n" + temp_string.replace("[[", " [").replace("]]", "] ") + "\n}"
+        m,n = self.shape
+        return f"mat[{m},{n}]"+ "{\n" + temp_string.replace("[[", " [").replace("]]", "] ") + "\n}"
 
     def plot(self):
         plt.imshow(np.log10(1e-15 + np.abs(self)))
@@ -317,6 +323,13 @@ class MatrixFactorizationResult:
     Y: mat
     Yi: mat
 
+    def is_valid(self):
+        m,n = A.shape
+        return (mat.id(m) - X @ Xi).is_null() \
+            and (mat.id(n) - Y @ Yi).is_null() \
+            and (R - Xi @ A @ Y).is_null() \
+            (A - X @ R @ Yi).is_null()
+
     def plot(self):
         fig, (ax1,ax2,ax3) = plt.subplots(
             nrows=1,ncols=3,figsize=(15,5))
@@ -324,6 +337,15 @@ class MatrixFactorizationResult:
         ax1.imshow(prep(self.X))
         ax2.imshow(prep(self.A))
         ax3.imshow(prep(self.Yi))
+
+    def __iter__(self):
+        # This is so that
+        #   A,X,Xi,Y,Yi = factor(...)
+        # and
+        #   res = MatrixFactorizationResult(factor())
+        # work
+        return iter([self.A, self.X, self.Xi, self.Y, self.Yi])
+
 
 def rd_gauss(A: np.ndarray):
     """
@@ -351,11 +373,11 @@ def rd_gauss(A: np.ndarray):
 
     check()
 
-    H("# 1. Termination Conditions")
+    # H("# 1. Termination Conditions")
     if n == 0 or m == 0 or R.is_null():
         return (R, X, Xi, Y, Yi)
 
-    H("# 2. Pivot Selection")
+    # H("# 2. Pivot Selection")
     pivot = np.unravel_index(np.argmax(R, axis=None), R.shape)
     d = R[pivot]
     P = mat.perm(perm_transposition(m, 0, pivot[0]))
@@ -367,7 +389,7 @@ def rd_gauss(A: np.ndarray):
     Y = Y @ Q
     check()
 
-    H("# 3. Column elimination")
+    # H("# 3. Column elimination")
     b = -R.col(0) / d
     E = elim(m, b)
     Ei = elim(m, -b)
@@ -376,7 +398,7 @@ def rd_gauss(A: np.ndarray):
     Xi = E @ Xi
     check()
 
-    H("# 3. Row elimination")
+    # H("# 3. Row elimination")
     b = -R.row(0) / d
     E = elim_col(n, b)
     Ei = elim_col(n, -b)
@@ -385,7 +407,7 @@ def rd_gauss(A: np.ndarray):
     Y = Y @ E
     check()
 
-    H("# 4. Recursion")
+    # H("# 4. Recursion")
 
     def extend(M):
         return mat.id(1).vsum(M)
@@ -400,6 +422,26 @@ def rd_gauss(A: np.ndarray):
     Y = Y @ Y2
     check()
     return (R, X, Xi, Y, Yi)
+
+
+def elim2_row(n, r, b_orig):
+    b = b_orig.copy()
+    """returns nxn Gauss elimination matrix"""
+    E = mat.id(n)
+    b[:r,:] = 0
+    E.set_col(r, b)
+    E[r, r] = 1
+    return E
+
+
+def elim2_col(n, r, b_orig):
+    """returns nxn Gauss elimination matrix"""
+    b = b_orig.copy()
+    E = mat.id(n)
+    b[:,:r] = 0
+    E.set_row(r, b)
+    E[r, r] = 1
+    return E
 
 def rd_gauss2(A: np.ndarray):
     """
@@ -415,64 +457,36 @@ def rd_gauss2(A: np.ndarray):
     Y = mat.id(n)
     Yi = mat.id(n)
 
-    def check():
-        # print("CHECK!")
-        # print("A", A)
-        # print("DECOP:", Xi, R ,Y)
-        assert (mat.id(m) - X @ Xi).is_null()
-        assert (mat.id(n) - Y @ Yi).is_null()
-        assert (R - Xi @ A @ Y).is_null()
-        assert (A - X @ R @ Yi).is_null()
-        # print("OK")
+    for r in range(min(m,n)):
+        # Pivot selection
+        M = np.abs(R[r:,r:])
+        pivot = np.unravel_index(np.argmax(M, axis=None), M.shape)
+        pivot = [ pivot[0] + r, pivot[1] + r ]
+        d = R[pivot[0], pivot[1]]
+        if abs(d) < EPS:
+            break
+        P = mat.perm(perm_transposition(m, r, pivot[0]))
+        Q = mat.perm(perm_transposition(n, r, pivot[1]))
+        R = P @ R @ Q
+        X = X @ P.T
+        Xi = P @ Xi
+        Yi = Q.T @ Yi
+        Y = Y @ Q
 
-    check()
+        # Column elimination
+        b = -R.col(r) / d
+        E = elim2_row(m, r, b)
+        Ei = elim2_row(m, r, -b)
+        R = E @ R
+        X = X @ Ei
+        Xi = E @ Xi
 
-    H("# 1. Termination Conditions")
-    if n == 0 or m == 0 or R.is_null():
-        return (R, X, Xi, Y, Yi)
+        # Row Elimination
+        b = -R.row(r) / d
+        E = elim2_col(n, r, b)
+        Ei = elim2_col(n, r, -b)
+        R = R @ E
+        Yi = Ei @ Yi
+        Y = Y @ E
 
-    H("# 2. Pivot Selection")
-    pivot = np.unravel_index(np.argmax(R, axis=None), R.shape)
-    d = R[pivot]
-    P = mat.perm(perm_transposition(m, 0, pivot[0]))
-    Q = mat.perm(perm_transposition(n, 0, pivot[1]))
-    R = P @ R @ Q
-    X = X @ P.T
-    Xi = P @ Xi
-    Yi = Q.T @ Yi
-    Y = Y @ Q
-    check()
-
-    H("# 3. Column elimination")
-    b = -R.col(0) / d
-    E = elim(m, b)
-    Ei = elim(m, -b)
-    R = E @ R
-    X = X @ Ei
-    Xi = E @ Xi
-    check()
-
-    H("# 3. Row elimination")
-    b = -R.row(0) / d
-    E = elim_col(n, b)
-    Ei = elim_col(n, -b)
-    R = R @ E
-    Yi = Ei @ Yi
-    Y = Y @ E
-    check()
-
-    H("# 4. Recursion")
-
-    def extend(M):
-        return mat.id(1).vsum(M)
-
-    B = R[1:, 1:]
-    R2, X2, X2i, Y2, Y2i = [extend(M) for M in rd_gauss(B)]
-    R = R2
-    R[0, 0] = d
-    X = X @ X2
-    Xi = X2i @ Xi
-    Yi = Y2i @ Yi
-    Y = Y @ Y2
-    check()
-    return (R, X, Xi, Y, Yi)
+    return MatrixFactorizationResult(R, X, Xi, Y, Yi)
