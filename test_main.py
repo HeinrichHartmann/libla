@@ -17,35 +17,12 @@ TEST_A = [
     mat.rand_rk(30,3),
 ]
 
-def test_ldu():
+def test_mf_gauss():
     def check(A):
-        P,L,D,U,Q = ldu(A)
-        assert (A - P @ L @ D @ U @ Q).is_null()
-    for A in TEST_A:
-        check(A)
+        res = mf_gauss(A)
+        assert res.is_valid()
+        assert res.R.is_diagonal()
+        assert (res.map(A) - res.R).is_null()
 
-def test_rd():
-    def check(A):
-        R,X,Xi,Y,Yi = rd_gauss(A)
-        m,n = A.shape
-        assert (mat.id(m) - X @ Xi).is_null()
-        assert (mat.id(n) - Y @ Yi).is_null()
-        assert (R - Xi @ A @ Y).is_null()
-        assert (A - X @ R @ Yi).is_null()
-        np.fill_diagonal(R, 0)
-        assert R.is_null()
-    for A in TEST_A:
-        check(A)
-
-def test_rd2():
-    def check(A):
-        R,X,Xi,Y,Yi = rd_gauss2(A)
-        m,n = A.shape
-        assert (mat.id(m) - X @ Xi).is_null()
-        assert (mat.id(n) - Y @ Yi).is_null()
-        assert (R - Xi @ A @ Y).is_null()
-        assert (A - X @ R @ Yi).is_null()
-        np.fill_diagonal(R, 0)
-        assert R.is_null()
     for A in TEST_A:
         check(A)
