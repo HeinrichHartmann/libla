@@ -407,7 +407,4 @@ def rd_svd(A: Matrix):
     A = Matrix(A)
     U,S,V = A.svd() # A = U @ S @ V
     # assert(A.is_sim(U @ S @ V))
-    # A = U S V
-    # S = U.T @ A @ V.T
-    # X = U.T; Y = V.T
     return MatrixDecomposition(U.T, U, V.T, V, S)
