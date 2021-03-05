@@ -31,15 +31,17 @@ class Matrix(np.ndarray):
         A = np.random.randn(m, n)
         U, sigma, VT = la.svd(A)
         sigma[r:] = 0
-        print("U", U.shape)
         S = np.zeros(A.shape)
         np.fill_diagonal(S, sigma)
-        print("VT", VT.shape)
         return Matrix(U @ S @ VT)
 
     @classmethod
     def id(cls, n):  # "identity (id)"
         return Matrix(np.identity(n))
+
+    @classmethod
+    def null(cls, m, n):
+        return Matrix(np.zeros([m,n]))
 
     @classmethod
     def perm(cls, p):
@@ -85,6 +87,9 @@ class Matrix(np.ndarray):
 
     def inv(self):
         "Return Inverse Matrix"
+        m,n = self.shape
+        if n == 0 and m == 0:
+            return self # 0x0 matrix is self inverse
         return Matrix(la.inv(self))
 
     def pinv(self):
@@ -92,8 +97,11 @@ class Matrix(np.ndarray):
         return Matrix(la.pinv(self, cond=EPS))
 
     def svd(self):
-        U, s, V = la.svd(self)
-        return (Matrix(U), Matrix(s), Matrix(V))
+        """Returns U,S,Vh so that self = U @ S @ Vh"""
+        U, s, Vh = la.svd(self)
+        S = np.zeros(self.shape)
+        np.fill_diagonal(S, s)
+        return (Matrix(U), Matrix(S), Matrix(Vh))
 
     def rank(self):
         s = la.svd(self, compute_uv=False)
@@ -114,13 +122,16 @@ class Matrix(np.ndarray):
         x, res, rk, s = la.lstsq(X, X[:, 1])
         return la.lstsq(self, b)
 
-    def row(self, i):
+    def get_row(self, i):
         "select i-th row"
         return self[i, :].to_row()
 
-    def col(self, j):
+    def get_col(self, j):
         "select j-th col"
         return self[:, j].to_col()
+
+    def get_diag(self):
+        return np.array(np.diag(self))
 
     def to_row(self):
         return Matrix(self.reshape([1, self.size]))
@@ -254,10 +265,10 @@ class MatrixTransform:
         return (Matrix.id(m) - X @ Xi).is_null() and (Matrix.id(n) - Y @ Yi).is_null()
 
     def map(self, v):
-        return self.Xi @ v @ self.Yi
+        return self.X @ v @ self.Y
 
     def imap(self, w):
-        return self.X @ w @ self.Y
+        return self.Xi @ w @ self.Yi
 
     def __iter__(self):
         # convert to tuple
@@ -285,7 +296,7 @@ class MatrixDecomposition(MatrixTransform):
         ax3.imshow(prep(self.Y))
 
 
-def md_gauss(A: np.ndarray):
+def rd_gauss(A: Matrix):
     """
     Returns MatrixDecomposition with:
     X = product of permutation and lower triagonal matrix
@@ -343,7 +354,7 @@ def md_gauss(A: np.ndarray):
         Yi = Yi @ Q
 
         # Column elimination
-        b = -R.col(r) / d
+        b = -R.get_col(r) / d
         E = elim_row(m, r, b)
         Ei = elim_row(m, r, -b)
         R = E @ R
@@ -351,11 +362,52 @@ def md_gauss(A: np.ndarray):
         Xi = E @ Xi
 
         # Row Elimination
-        b = -R.row(r) / d
+        b = -R.get_row(r) / d
         E = elim_col(n, r, b)
         Ei = elim_col(n, r, -b)
         R = R @ E
         Y = Ei @ Y
         Yi = Yi @ E
 
-    return MatrixDecomposition(X, Xi, Y, Yi, R)
+    return MatrixDecomposition(Xi, X, Yi, Y, R)
+
+def rd_qr(A: Matrix):
+    A = Matrix(A)
+    m,n = A.shape
+    Q, R, p = la.qr(A, pivoting=True)
+    Q = Matrix(Q)
+    R = Matrix(R)
+    P = Matrix.perm(p)
+    # assert (A @ P).is_sim(Q @ R)
+    r = (np.abs(R.get_diag()) > EPS).sum()
+    if r == 0:
+        X = Matrix.id(m)
+        Y = Matrix.id(n)
+        return MatrixDecomposition(X, X, Y, Y, A)
+    # R = [ R0 R1 ]
+    #     [  0  0 ]
+    R0 = R[:r,:r]
+    R1 = R[:r,r:]
+    R0i = R0.inv() # inverse of triangular matrix can be computed by back-substitution
+    Su = Matrix(R0i).join_col(-R0i @ R1)
+    Sl = Matrix.null(n-r,r).join_col(Matrix.id(n-r))
+    S  = Su.join_row(Sl)
+    Siu = Matrix(R0).join_col(R1)
+    Sil = Matrix.null(n-r,r).join_col(Matrix.id(n-r))
+    Si = Siu.join_row(Sil)
+    # assert (S @ Si).is_sim(Matrix.id(n))
+    X = Q.T
+    Xi = Q
+    Y = P @ S
+    Yi = Si @ P.T
+    B = R @ S
+    return MatrixDecomposition(X, Xi, Y, Yi, B)
+
+def rd_svd(A: Matrix):
+    A = Matrix(A)
+    U,S,V = A.svd() # A = U @ S @ V
+    # assert(A.is_sim(U @ S @ V))
+    # A = U S V
+    # S = U.T @ A @ V.T
+    # X = U.T; Y = V.T
+    return MatrixDecomposition(U.T, U, V.T, V, S)

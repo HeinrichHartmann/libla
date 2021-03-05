@@ -2,7 +2,7 @@ import pytest
 from main import *
 import numpy as np
 
-from hypothesis import given, example, assume, strategies as st
+from hypothesis import given, example, assume, settings, strategies as st
 import hypothesis.extra.numpy as hnp
 
 def test_Matrix():
@@ -57,11 +57,51 @@ def test_rand_float_matrix(A):
 @example(Matrix.rand_rk(3,5,3))
 @example(Matrix.rand_rk(5,3,3))
 @example(Matrix.rand_rk(30,20,3))
-def test_mf_gauss(A):
+def test_rd_gauss(A):
     A = Matrix(A)
     assume(np.isfinite(A).all())
-    res = md_gauss(A)
+    res = rd_gauss(A)
     assert res.is_valid()
     assert res.R.is_diagonal()
     assert (res.map(A) - res.R).is_null()
     assert res.R.rank() == A.rank()
+
+
+@given(hnp.arrays(np.float64, (3,3), elements=st.floats(0,1)))
+@example(Matrix.from_str("0 0 0"))
+@example(Matrix.from_str("0 0 0"))
+@example(Matrix.from_str("1 1 1 ; 3 1 5"))
+@example(Matrix.from_str("0 1 ; 1 1"))
+@example(Matrix.rand_rk(5,5,3))
+@example(Matrix.rand_rk(3,5,3))
+@example(Matrix.rand_rk(5,3,3))
+@example(Matrix.rand_rk(30,20,3))
+@settings(report_multiple_bugs=False)
+def test_rd_svd(A):
+    A = Matrix(A)
+    assume(np.isfinite(A).all())
+    res = rd_svd(A)
+    assert res.is_valid()
+    assert res.R.is_diagonal()
+    assert (res.map(A) - res.R).is_null()
+    assert res.R.rank() == A.rank()
+
+
+@given(hnp.arrays(np.float64, (3,3), elements=st.floats(0,1)))
+@example(Matrix.from_str("0 0 0"))
+@example(Matrix.from_str("0 0 0"))
+@example(Matrix.from_str("1 1 1 ; 3 1 5"))
+@example(Matrix.from_str("0 1 ; 1 1"))
+@example(Matrix.rand_rk(5,5,3))
+@example(Matrix.rand_rk(3,5,3))
+@example(Matrix.rand_rk(5,3,3))
+@example(Matrix.rand_rk(30,20,3))
+@settings(report_multiple_bugs=False)
+def test_rd_qr(A):
+    A = Matrix(A)
+    assume(np.isfinite(A).all())
+    res = rd_qr(A)
+    assert res.is_valid()
+    assert (res.map(A) - res.R).is_null()
+    assert res.R.rank() == A.rank()
+    assert res.R.is_diagonal()
