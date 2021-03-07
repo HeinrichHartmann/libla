@@ -5,7 +5,7 @@ In this library we provide a collection of sub-classes of np.array that speciali
 array as linear map (Matrix), sub-vector space (Vect), etc. and provide a collection of common high-level
 operations for the concept at hand.
 
-**Disclaimer** This library is in it's infancy. We do have quite some tests, so correctness should be OK, but expect things to change without warning.
+**Disclaimer** This library is in it's infancy. Expect things to change without warning.
 
 ## Example
 
