@@ -1,9 +1,12 @@
+import sys
+import os
 import pytest
-from main import *
 import numpy as np
-
 from hypothesis import given, example, assume, settings, strategies as st
 import hypothesis.extra.numpy as hnp
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from libla import Matrix
 
 def test_Matrix():
     M = Matrix.id(3)
@@ -57,10 +60,10 @@ def test_rand_float_matrix(A):
 @example(Matrix.rand_rk(3,5,3))
 @example(Matrix.rand_rk(5,3,3))
 @example(Matrix.rand_rk(30,20,3))
-def test_rd_gauss(A):
+def test_rd_lu(A):
     A = Matrix(A)
     assume(np.isfinite(A).all())
-    res = rd_gauss(A)
+    res = A.rank_decomposition(method="lu")
     assert res.is_valid()
     assert res.R.is_diagonal()
     assert (res.map(A) - res.R).is_null()
@@ -80,7 +83,7 @@ def test_rd_gauss(A):
 def test_rd_svd(A):
     A = Matrix(A)
     assume(np.isfinite(A).all())
-    res = rd_svd(A)
+    res = A.rank_decomposition(method="svd")
     assert res.is_valid()
     assert res.R.is_diagonal()
     assert (res.map(A) - res.R).is_null()
@@ -100,7 +103,7 @@ def test_rd_svd(A):
 def test_rd_qr(A):
     A = Matrix(A)
     assume(np.isfinite(A).all())
-    res = rd_qr(A)
+    res = A.rank_decomposition(method="qr")
     assert res.is_valid()
     assert (res.map(A) - res.R).is_null()
     assert res.R.rank() == A.rank()
