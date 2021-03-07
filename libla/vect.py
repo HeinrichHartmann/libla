@@ -1,6 +1,7 @@
 import numpy as np
+import scipy.linalg as la
 
-from . import Matrix
+from . import Matrix, EPS
 
 
 class Vect(Matrix):

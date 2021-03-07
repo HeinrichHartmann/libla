@@ -270,7 +270,7 @@ class Matrix(np.ndarray):
         )
         m, n = self.shape
         return (
-            f"mat[{m},{n}]"
+            f"Matrix[{m},{n}]"
             + "{\n"
             + temp_string.replace("[[", " [").replace("]]", "] ")
             + "\n}"
