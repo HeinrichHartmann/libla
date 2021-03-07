@@ -80,6 +80,17 @@ def rd_lu(A: Matrix):
 
     return MatrixDecomposition(Xi, X, Yi, Y, R)
 
+def triangular_inverse(R):
+    # Compute invserse of triangular matrix using back-substitution
+    n,m = R.shape
+    assert n == m
+    return la.solve_triangular(R, Matrix.id(n))
+
+# https://stackoverflow.com/a/55737198/1209380
+def perm_inv(permutation):
+    inv = np.empty_like(permutation)
+    inv[permutation] = np.arange(len(inv), dtype=inv.dtype)
+    return inv
 
 def rd_qr(A: Matrix):
     A = Matrix(A)
@@ -87,7 +98,7 @@ def rd_qr(A: Matrix):
     Q, R, p = la.qr(A, pivoting=True)
     Q = Matrix(Q)
     R = Matrix(R)
-    P = Matrix.perm(p)
+    # P = Matrix.perm(p)
     # assert (A @ P).is_sim(Q @ R)
     r = (np.abs(R.get_diag()) > EPS).sum()
     if r == 0:
@@ -98,7 +109,7 @@ def rd_qr(A: Matrix):
     #     [  0  0 ]
     R0 = R[:r, :r]
     R1 = R[:r, r:]
-    R0i = R0.inv()  # inverse of triangular matrix can be computed by back-substitution
+    R0i = triangular_inverse(R0)
     Su = Matrix(R0i).join_col(-R0i @ R1)
     Sl = Matrix.null(n - r, r).join_col(Matrix.id(n - r))
     S = Su.join_row(Sl)
@@ -108,11 +119,16 @@ def rd_qr(A: Matrix):
     # assert (S @ Si).is_sim(Matrix.id(n))
     X = Q.T
     Xi = Q
-    Y = P @ S
-    Yi = Si @ P.T
-    B = R @ S
+    # Calculating products with permutation matrices takes more time than the QR decomposition
+    # itself. Re-arranging the rows directly is much faster:
+    Y = S.perm_row(perm_inv(p)) # = P @ S
+    Yi = Si.perm_col(perm_inv(p)) # = Si @ P.T
+    # Calculating the reduced diagonal matrix takes about half the time of the QR decomposition.
+    # Since we know what the result should be we return it directly:
+    # B = R @ S
+    B = Matrix.null(m,n)
+    np.fill_diagonal(B[:r,:r], 1)
     return MatrixDecomposition(X, Xi, Y, Yi, B)
-
 
 def rd_svd(A: Matrix):
     A = Matrix(A)

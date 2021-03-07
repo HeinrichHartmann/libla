@@ -6,8 +6,6 @@ from dataclasses import dataclass
 
 from . import EPS
 
-print(EPS)
-
 # Forward declaration
 Matrix = None
 rank_decomposition = None
@@ -65,6 +63,9 @@ class MatrixDecomposition(MatrixTransform):
 
 
 class Matrix(np.ndarray):
+    """
+    Represents a matrix.
+    """
     # https://numpy.org/devdocs/user/basics.subclassing.html#simple-example-adding-an-extra-attribute-to-ndarray
     def __new__(cls, X):
         obj = np.asarray(X).view(cls)
@@ -206,6 +207,14 @@ class Matrix(np.ndarray):
 
     def set_col(self, j, c):
         self[:, j] = Matrix(c).to_col()[:, 0]
+
+    def perm_col(self, p):
+        "Apply permutation to columns"
+        return self[:,p]
+
+    def perm_row(self, p):
+        "Apply permutation to rows"
+        return self[p,:]
 
     def rank_decomposition(self, *args, **kwargs):
         return rank_decomposition(self, *args, **kwargs)
