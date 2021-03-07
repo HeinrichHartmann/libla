@@ -1,4 +1,4 @@
-# libla -- A Linear Algebra Library for Python/numpy
+# libla - A Linear Algebra Library for Python/numpy
 
 Many linear algebra concepts are commonly represented by a Matrix i.e. a numpy array.  In this
 library we provide a collection of sub-classes of np.array that specialize the interpretation of the
