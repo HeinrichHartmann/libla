@@ -4,7 +4,7 @@ Many linear algebra concepts are commonly represented by a Matrix i.e. a numpy a
 library we provide a collection of sub-classes of np.array that specialize the interpretation of the
 array as linear map, sub-vector space, etc. and provide a collection of common high-level operations.
 
-```
+```python
 > X = Matrix.rand_rk(10, 5, 3) # random 10x5 matrix of rank 3
 
 > X.rank()
