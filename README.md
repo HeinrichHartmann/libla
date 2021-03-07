@@ -34,7 +34,8 @@ Matrix[2,5]{
 }
 
 > V = Vect.Im(X) # Image vector space
-V.dim()
+> V.dim()
+3
 
 > V.contains(X.get_col(3))
 True
